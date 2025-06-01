@@ -28,103 +28,61 @@ LAZYPATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
 git clone https://github.com/folke/lazy.nvim.git --filter=blob:none "$LAZYPATH"
 
 # 5. Create init.lua
-echo "📝 Writing init.lua..."
-cat <<EOF > ~/.config/nvim/init.lua
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
-  vim.fn.system({
-    "git",
-    "clone",
-    "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    lazypath,
-  })
-end
-vim.opt.rtp:prepend(lazypath)
-require("lazy").setup("plugins")
-EOF
+#!/bin/bash
 
-# 6. Create plugin config for Catppuccin
-echo "🎨 Writing Catppuccin plugin config..."
-cat <<'EOF' > ~/.config/nvim/lua/plugins/catppuccin.lua
+set -e
+
+echo "🔄 Cleaning existing Neovim setup..."
+rm -rf ~/.config/nvim ~/.local/share/nvim ~/.cache/nvim
+
+echo "📦 Installing dependencies..."
+sudo apt update
+sudo apt install -y git curl unzip ripgrep fd-find build-essential python3-pip nodejs npm cargo jq libxml2-utils openssl
+
+echo "⬇️ Installing extra tools..."
+# grpcurl
+go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+# websocat
+cargo install websocat
+
+echo "🛠 Setting up Neovim plugins..."
+npm i -g neovim typescript typescript-language-server eslint prettier
+pip3 install pynvim
+
+echo "🌟 Installing LazyVim starter..."
+git clone https://github.com/LazyVim/starter ~/.config/nvim
+
+echo "🧩 Adding Kulala.nvim plugin..."
+cat > ~/.config/nvim/lua/plugins/kulala.lua << 'EOF'
 return {
-  "catppuccin/nvim",
-  name = "catppuccin",
-  priority = 1000,
-  config = function()
-    local present, catppuccin = pcall(require, "catppuccin")
-    if not present then return end
-
-    catppuccin.setup({
-      flavour = "mocha",
-      transparent_background = vim.g.neovide and true or false,
-      show_end_of_buffer = false,
-      term_colors = true,
-      dim_inactive = {
-        enabled = false,
-        shade = "dark",
-        percentage = 0.15,
-      },
-      styles = {
-        comments = { "italic" },
-        conditionals = { "italic" },
-        keywords = { "italic" },
-      },
-      integrations = {
-        cmp = true,
-        gitsigns = true,
-        nvimtree = true,
-        telescope = true,
-        which_key = true,
-        indent_blankline = { enabled = true },
-        native_lsp = {
-          enabled = true,
-          virtual_text = {
-            errors = { "italic" },
-            hints = { "italic" },
-            warnings = { "italic" },
-            information = { "italic" },
-          },
-          underlines = {
-            errors = { "underline" },
-            hints = { "underline" },
-            warnings = { "underline" },
-            information = { "underline" },
-          },
-        },
-      },
-      color_overrides = {
-        mocha = {
-          base = "#0f0f1a",
-          mantle = "#13131e",
-          crust = "#1a1a2b",
-        },
-      },
-      highlight_overrides = {
-        mocha = function(colors)
-          return {
-            TelescopeTitle       = { fg = colors.peach },
-            TelescopeNormal      = { bg = "NONE" },
-            TelescopeBorder      = { fg = "NONE", bg = "NONE" },
-            CursorLineNr         = { fg = colors.yellow },
-            LineNr               = { fg = colors.surface1 },
-            VertSplit            = { fg = colors.surface0 },
-            WinSeparator         = { fg = colors.surface0 },
-            MsgArea              = { fg = colors.text },
-            EcovimPrimary        = { fg = "#488dff" },
-            EcovimSecondary      = { fg = "#FFA630" },
-            EcovimHeader         = { fg = "#488dff", bold = true },
-            EcovimFooter         = { fg = "#FFA630", bold = true },
-            EcovimNvimTreeTitle  = { fg = "#FFA630", bg = "#16161e", bold = true },
-            BufferLineFill       = { bg = "#16161E", fg = colors.surface1 },
-          }
-        end,
-      },
-    })
-
-    vim.cmd("colorscheme catppuccin")
-  end,
+  "mistweaverco/kulala.nvim",
+  keys = {
+    { "<leader>Rs", desc = "Send request" },
+    { "<leader>Ra", desc = "Send all requests" },
+    { "<leader>Rb", desc = "Open scratchpad" },
+  },
+  ft = { "http", "rest" },
+  opts = {
+    global_keymaps = true,
+    global_keymaps_prefix = "<leader>R",
+    kulala_keymaps_prefix = "",
+  },
 }
 EOF
 
-echo "✅ Setup complete! Launch Neovim and run :Lazy to install plugins."
+echo "📁 Adding filetype support for .http files..."
+mkdir -p ~/.config/nvim/lua/config
+cat > ~/.config/nvim/lua/config/filetypes.lua << 'EOF'
+vim.filetype.add({
+  extension = {
+    ['http'] = 'http',
+  },
+})
+EOF
+
+echo 'require("config.filetypes")' >> ~/.config/nvim/init.lua
+
+echo "🚀 Launching Neovim to install plugins..."
+nvim --headless "+Lazy! sync" +qa
+
+echo "✅ Setup complete. Run Neovim with 'nvim <file>.http'"
